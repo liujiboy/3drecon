@@ -10,20 +10,23 @@
 #include "Utils.hpp"
 Sparse::Sparse(const std::string&dir,const std::string&parFile,const std::string&visFile)
 {
-    std::cout<<"加载图像中..."<<std::endl;
+    
     loadImages(dir, parFile);
     loadVisData(dir,visFile);
+    std::cerr<<"检测特征点："<<std::endl;
     for (Image &image:images) {
         image.detectFeatures();
     }
-    }
+}
 void Sparse::loadVisData(const std::string&dir,const std::string&visFile)
 {
+    std::cerr<<"加载可见性数据";
     std::ifstream vis((dir+visFile).c_str());
     std::string header;
     int num;
     vis>>header>>num;
     for (int i=0; i<num; i++) {
+        std::cerr<<"*";
         int index1,index2,index2Size;
         vis>>index1>>index2Size;
         for(int j=0;j<index2Size;j++)
@@ -35,32 +38,37 @@ void Sparse::loadVisData(const std::string&dir,const std::string&visFile)
             images[index1].F.push_back(F);
         }
     }
-
+    std::cerr<<std::endl;
+    
 }
 void Sparse::loadImages(const std::string&dir,const std::string&parFile)
 {
+    std::cerr<<"加载图像中:";
     std::ifstream fin((dir+parFile).c_str());
     int n;
     fin>>n;
     //images.resize(n);
     for(int i=0;i<n;i++)
     {
+        std::cerr<<"*";
         std::string name;
         cv::Mat_<double> k(3,3);
         cv::Mat_<double> rt(3,4);
         fin>>name>>k(0,0)>>k(0,1)>>k(0,2)>>k(1,0)>>k(1,1)>>k(1,2)>>k(2,0)>>k(2,1)>>k(2,2)>>rt(0,0)>>rt(0,1)>>rt(0,2)>>rt(1,0)>>rt(1,1)>>rt(1,2)>>rt(2,0)>>rt(2,1)>>rt(2,2)>>rt(0,3)>>rt(1,3)>>rt(2,3);
         images.push_back(Image(dir+name,i,k,rt));
     }
+    std::cerr<<std::endl;
     
 }
 
-#define SPARSE_DBUBG
+
 void Sparse::buildPatches()
 {
-
-    std::cout<<"开始处理"<<std::endl;
-
+    
+    std::cerr<<"开始重建"<<std::endl;
+    
     for (Image &rimage:images) {
+        std::cerr<<"重建图像"<<rimage.id<<",待计算特征点数为:"<<rimage.features.size()<<std::endl;
         if(rimage.nimages.size()<2)
             continue;
         
@@ -68,10 +76,8 @@ void Sparse::buildPatches()
         start=clock();
         
         for (const Feature &f1:rimage.features) {
-
             
-            //cout<<"正在处理"<<ti<<"特征"<<tj++<<"共有特征"<<rimage.features.size()<<endl;
-
+            
             if(f1.isInEmptyCell())
             {
                 int success=0,fail1=0,fail2=0,fail3=0;
@@ -82,22 +88,22 @@ void Sparse::buildPatches()
                              utils::triangluate(f1, f2, f2.point4D);
                          }
                          );
-//                sort(features.begin(), features.end(), [&](const Feature&fa,const Feature&fb)->bool {
-//                    if (fa.getDistanceToCameraCenter(rimage.cameraCenter)<fb.getDistanceToCameraCenter(rimage.cameraCenter)) {
-//                        return true;
-//                    }
-//                    else
-//                    {
-//                        return false;
-//                    }
-//                });
+                //                sort(features.begin(), features.end(), [&](const Feature&fa,const Feature&fb)->bool {
+                //                    if (fa.getDistanceToCameraCenter(rimage.cameraCenter)<fb.getDistanceToCameraCenter(rimage.cameraCenter)) {
+                //                        return true;
+                //                    }
+                //                    else
+                //                    {
+                //                        return false;
+                //                    }
+                //                });
                 PPatch bestPatch;
                 double bestCost=-1;
                 for (const Feature &f2:features) {
-
+                    
                     if(utils::cosangle(f2.point4D, rimage.cameraCenter, f2.image->cameraCenter)<0.6)
                     {
-                        // cout<<s<<endl;
+                        
                         fail1++;
                         continue;
                     }
@@ -105,13 +111,12 @@ void Sparse::buildPatches()
                     p->center=f2.point4D;
                     p->normal=rimage.cameraCenter-f2.point4D;
                     double n=norm(p->normal);
-                    //                    if(n<0.1)
-                    //                        continue;
+
                     p->normal=p->normal/n;
                     p->rimage=&rimage;
                     p->updateImage(0.4, 0.4);
                     
-                    if(p->timages.size()<=3)
+                    if(p->timages.size()<=2)
                     {
                         fail2++;
                         continue;
@@ -121,7 +126,7 @@ void Sparse::buildPatches()
                     
                     p->updateImage(0.4, 0.7);
                     //p->showResult();
-                    if(p->timages.size()>=4)
+                    if(p->timages.size()>=2)
                     {
                         success++;
                         if(p->cost>bestCost)
@@ -141,16 +146,20 @@ void Sparse::buildPatches()
                     int pid=(int)patches.size()-1;
                     bestPatch->updateImageCell(pid);
                 }
-              //  std::cout<<f1.x<<" "<<f1.y<<" "<<features.size()<<" "<<fail1<<" "<<fail2<<" "<<fail3<<" "<<success<<std::endl;
+                
+                //std::cerr<<"特征点位置：("<<f1.x<<","<<f1.y<<")，待计算特征点："<<features.size()<<"角度过大特征点："<<fail1<<"图像数过少特征点："<<fail2<<"优化后图像数过少特征点："<<fail3<<"成功的特征点："<<success<<std::endl;
+                //输出特征点重建情况，
+                std::cerr<<"特征点位置:("<<rimage.id<<","<<f1.x<<","<<f1.y<<"),total:"<<features.size()<<",fail:"<<(fail1+fail2+fail3)<<",success:"<<success<<std::endl;
             }
             
             
-
+            
             
         }
-        savePatches("a.ply");
+        
         finish=clock();
-        std::cout<<(double)(finish-start)/CLOCKS_PER_SEC<<"s"<<std::endl;
+        std::cerr<<"耗时"<<(double)(finish-start)/CLOCKS_PER_SEC<<"s"<<std::endl;
+        savePatches("a.ply");
     }
     
 }
@@ -188,6 +197,6 @@ void Sparse::savePatches(const std::string &fileName)
         fout<<center(0,0)<<" "<<center(1,0)<<" "<<center(2,0)<<" "<<(int)r<<" "<<(int)g<<" "<<(int)b<<std::endl;
     }
     fout.close();
-    std::cout<<"保存结束"<<std::endl;
+    std::cerr<<"保存结束"<<std::endl;
 }
 

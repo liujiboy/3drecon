@@ -56,7 +56,7 @@ void Image::detectFeatures()
     cv::Mat dst;
     cv::cvtColor(data, dst, cv::COLOR_BGR2GRAY);
     cv::goodFeaturesToTrack(dst, corners, 400, 0.04, 10);
-    std::cout<<corners.size()<<std::endl;
+    std::cerr<<"图像"<<id<<"检测到特征点"<<corners.size()<<std::endl;
     for (int i=0; i<corners.size(); i++) {
                 Feature f;
                 f.image=this;
