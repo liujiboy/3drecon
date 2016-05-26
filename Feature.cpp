@@ -10,8 +10,8 @@
 #include "Utils.hpp"
 bool Feature::isInEmptyCell()const
 {
-    
-    return image->qt[y/2][x/2].empty()&&image->qf[y/2][x/2].empty();
+    return image->qt[y/2][x/2].empty();
+    //return image->qt[y/2][x/2].empty()&&image->qf[y/2][x/2].empty();
 }
 Mat3x1 Feature::toHomogeneous()const
 {
@@ -45,7 +45,7 @@ void Feature::findFeatures(std::vector<Feature>&featuresNearEpipolarLine)const
         for (const Feature &f:nimage->features) {
             if(f.isInEmptyCell())
             {
-            double d=abs(a*f.x+b*f.y+c)/sqrt(a*a+b*b);
+            double d=std::abs(a*f.x+b*f.y+c)/sqrt(a*a+b*b);
             if(d<=2)
             {
                 featuresNearEpipolarLine.push_back(f);

@@ -120,7 +120,8 @@
         sum+=pTex1.ncc(pTex2);
     }
    
-    double ret=sum/timages.size();
+    //double ret=sum/timages.size();
+    double ret=sum/timages.size()*(timages.size()-2); //为了鲁棒性，匹配的图片越多，分值越高
     if(std::isnan(ret)||std::isinf(ret))
         return -1;
     return ret;

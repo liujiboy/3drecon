@@ -128,6 +128,10 @@ void Sparse::buildPatches()
                     //p->showResult();
                     if(p->timages.size()>=2)
                     {
+                     /*   if (f1.x==424&&f1.y==339) {
+                            std::cerr<<p->cost<<std::endl;
+                            p->showResult();
+                        }*/
                         success++;
                         if(p->cost>bestCost)
                         {
@@ -141,6 +145,11 @@ void Sparse::buildPatches()
                     
                 }
                 if (bestPatch.get()!=NULL) {
+                    //这个特征点是明显的外点但是现在没办法检测
+                    /*if (f1.x==439&&f1.y==290) {
+                        bestPatch->showResult();
+                    }*/
+                    std::cerr<<"best:"<<bestPatch->center(0,0)<<" "<<bestPatch->center(1,0)<<" "<<bestPatch->center(2,0)<<std::endl;
                     patches.push_back(bestPatch);
                     
                     int pid=(int)patches.size()-1;
@@ -181,12 +190,12 @@ void Sparse::savePatches(const std::string &fileName)
     for (int i=0; i<patches.size(); i++) {
         Mat4x1 center=patches[i]->center;
         double r=0,g=0,b=0;
-        for(Image *i:patches[i]->timages)
+        for(Image *image:patches[i]->timages)
         {
-            Image &image=*i;
-            Mat3x1 x=image.project(center);
+            
+            Mat3x1 x=image->project(center);
             cv::Mat patch;
-            getRectSubPix(image.data, cv::Size(1,1), cv::Point2d(x(0,0),x(1,0)), patch);
+            getRectSubPix(image->data, cv::Size(1,1), cv::Point2d(x(0,0),x(1,0)), patch);
             b+=patch.at<cv::Vec3b>(0, 0)[0];
             g+=patch.at<cv::Vec3b>(0, 0)[1];
             r+=patch.at<cv::Vec3b>(0, 0)[2];
