@@ -14,6 +14,8 @@
 #include "Feature.hpp"
 #include "Tex.hpp"
 #include "Matmxn.hpp"
+#include<thread>
+#include<memory>
 class Feature;
 class Image{
 public:
@@ -30,7 +32,9 @@ public:
     Mat4x1 yaxis;
     Mat4x1 zaxis;
     std::vector<std::vector<std::set<int> > > qf; //Qf(i,j)
+    
     std::vector<std::vector<std::set<int> > > qt; //Qt(i,j)
+   // std::vector<std::vector<std::shared_ptr<std::mutex>> > cellLock;
     std::vector<std::vector<int> > depth; //depth(i,j)
     std::vector<Feature> features;
     cv::Mat descriptors;

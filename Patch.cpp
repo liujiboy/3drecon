@@ -95,8 +95,8 @@
     pyaxis=pyaxis*scale;
     double xdis=norm(image.project(center+pxaxis)-image.project(center));
     double ydis=norm(image.project(center+pyaxis)-image.project(center));
-    pxaxis=pxaxis/xdis;
-    pyaxis=pyaxis/ydis;
+    pxaxis=pxaxis/xdis*2;
+    pyaxis=pyaxis/ydis*2;
     
 }
 
@@ -189,19 +189,32 @@ void Patch::optimze()
 }
 void Patch::updateImageCell(int pid)
 {
+    int row,col;
     Mat3x1 coord=rimage->project(this->center);
-    rimage->qt[coord(1,0)/2][coord(0,0)/2].insert(pid);
+    row=coord(1,0)/2;
+    col=coord(0,0)/2;
+    //rimage->cellLock[row][col]->lock();
+    rimage->qt[row][col].insert(pid);
+    //rimage->cellLock[row][col]->unlock();
     
 
    for(Image *nimage:rimage->nimages)
     {
-         coord=nimage->project(this->center);
+        coord=nimage->project(this->center);
+        row=coord(1,0)/2;
+        col=coord(0,0)/2;
+        
         if(find(timages.begin(), timages.end(), nimage)!=timages.end())
         {
+            
+            //nimage->cellLock[row][col]->lock();
             nimage->qt[coord(1,0)/2][coord(0,0)/2].insert(pid);
+            //nimage->cellLock[row][col]->unlock();
         }else if(find(simages.begin(), simages.end(), nimage)!=simages.end()){
             
+            //nimage->cellLock[row][col]->lock();
             nimage->qf[coord(1,0)/2][coord(0,0)/2].insert(pid);
+            //nimage->cellLock[row][col]->unlock();
         }
         
     }

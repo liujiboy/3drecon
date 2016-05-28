@@ -8,15 +8,54 @@
 
 #include "Sparse.hpp"
 #include "Utils.hpp"
-Sparse::Sparse(const std::string&dir,const std::string&parFile,const std::string&visFile)
+#include<thread>
+#include<queue>
+#include <chrono>
+Sparse::Sparse(const std::string&dir,const std::string&parFile,const std::string&visFile,int n):nThread(n)
 {
     
     loadImages(dir, parFile);
     loadVisData(dir,visFile);
+    detectFeatures();
+}
+void Sparse::detectFeatures()
+{
     std::cerr<<"检测特征点："<<std::endl;
+    std::vector<std::thread> threads;
+    std::queue<Image*> imageQueue;
+    std::mutex m;
     for (Image &image:images) {
-        image.detectFeatures();
+        imageQueue.push(&image);
     }
+    for(int i=0;i<nThread;i++)
+    {
+        threads.push_back(std::thread([&](){
+            
+            while(true)
+            {
+                Image *image=NULL;
+                m.lock();
+                if(!imageQueue.empty())
+                {
+                    image=imageQueue.front();
+                    imageQueue.pop();
+                    std::cerr<<"检测图像"<<image->id<<std::endl;
+                    m.unlock();
+                }else
+                {
+                    m.unlock();
+                    break;
+                }
+                
+                image->detectFeatures();
+            }
+        }));
+    }
+    for(auto &t:threads)
+    {
+        t.join();
+    }
+
 }
 void Sparse::loadVisData(const std::string&dir,const std::string&visFile)
 {
@@ -66,111 +105,143 @@ void Sparse::buildPatches()
 {
     
     std::cerr<<"开始重建"<<std::endl;
-    
-    for (Image &rimage:images) {
-        std::cerr<<"重建图像"<<rimage.id<<",待计算特征点数为:"<<rimage.features.size()<<std::endl;
-        if(rimage.nimages.size()<2)
-            continue;
-        
-        clock_t start,finish;
-        start=clock();
-        
-        for (const Feature &f1:rimage.features) {
-            
-            
-            if(f1.isInEmptyCell())
+    std::chrono::high_resolution_clock::time_point start,end;
+    start= std::chrono::high_resolution_clock::now();
+    std::vector<std::thread> threads;
+    std::vector<Image*> shuffledImages;
+    for (Image &image:images) {
+        shuffledImages.push_back(&image);
+    }
+    std::random_shuffle(shuffledImages.begin(), shuffledImages.end());
+    std::queue<Image*> imageQueue;
+    std::mutex m;
+    for (Image *image:shuffledImages) {
+        imageQueue.push(image);
+    }
+    //random_shuffle(imageQueue.);
+    for(int i=0;i<nThread;i++)
+    {
+        threads.push_back(std::thread([&](){
+            while(true)
             {
-                int success=0,fail1=0,fail2=0,fail3=0;
-                std::vector<Feature> features;
-                f1.findFeatures(features);
-                for_each(features.begin(), features.end(),
-                         [&](Feature&f2){
-                             utils::triangluate(f1, f2, f2.point4D);
-                         }
-                         );
-                //                sort(features.begin(), features.end(), [&](const Feature&fa,const Feature&fb)->bool {
-                //                    if (fa.getDistanceToCameraCenter(rimage.cameraCenter)<fb.getDistanceToCameraCenter(rimage.cameraCenter)) {
-                //                        return true;
-                //                    }
-                //                    else
-                //                    {
-                //                        return false;
-                //                    }
-                //                });
-                PPatch bestPatch;
-                double bestCost=-1;
-                for (const Feature &f2:features) {
-                    
-                    if(utils::cosangle(f2.point4D, rimage.cameraCenter, f2.image->cameraCenter)<0.6)
-                    {
-                        
-                        fail1++;
-                        continue;
-                    }
-                    PPatch p=PPatch(new Patch());
-                    p->center=f2.point4D;
-                    p->normal=rimage.cameraCenter-f2.point4D;
-                    double n=norm(p->normal);
-
-                    p->normal=p->normal/n;
-                    p->rimage=&rimage;
-                    p->updateImage(0.4, 0.4);
-                    
-                    if(p->timages.size()<=2)
-                    {
-                        fail2++;
-                        continue;
-                    }
-                    
-                    p->optimze();
-                    
-                    p->updateImage(0.4, 0.7);
-                    //p->showResult();
-                    if(p->timages.size()>=2)
-                    {
-                     /*   if (f1.x==424&&f1.y==339) {
-                            std::cerr<<p->cost<<std::endl;
-                            p->showResult();
-                        }*/
-                        success++;
-                        if(p->cost>bestCost)
-                        {
-                            bestPatch=p;
-                            bestCost=p->cost;
-                        }
-                    }else
-                    {
-                        fail3++;
-                    }
-                    
-                }
-                if (bestPatch.get()!=NULL) {
-                    //这个特征点是明显的外点但是现在没办法检测
-                    /*if (f1.x==439&&f1.y==290) {
-                        bestPatch->showResult();
-                    }*/
-                    std::cerr<<"best:"<<bestPatch->center(0,0)<<" "<<bestPatch->center(1,0)<<" "<<bestPatch->center(2,0)<<std::endl;
-                    patches.push_back(bestPatch);
-                    
-                    int pid=(int)patches.size()-1;
-                    bestPatch->updateImageCell(pid);
+                Image *rimage=NULL;
+                m.lock();
+                if(!imageQueue.empty())
+                {
+                    rimage=imageQueue.front();
+                    imageQueue.pop();
+                    std::cerr<<"重建图像"<<rimage->id<<",待计算特征点数为:"<<rimage->features.size()<<std::endl;
+                    m.unlock();
+                }else
+                {
+                    m.unlock();
+                    break;
                 }
                 
-                //std::cerr<<"特征点位置：("<<f1.x<<","<<f1.y<<")，待计算特征点："<<features.size()<<"角度过大特征点："<<fail1<<"图像数过少特征点："<<fail2<<"优化后图像数过少特征点："<<fail3<<"成功的特征点："<<success<<std::endl;
-                //输出特征点重建情况，
-                std::cerr<<"特征点位置:("<<rimage.id<<","<<f1.x<<","<<f1.y<<"),total:"<<features.size()<<",fail:"<<(fail1+fail2+fail3)<<",success:"<<success<<std::endl;
+                if(rimage->nimages.size()<2)
+                    continue;
+                for (const Feature &f1:rimage->features) {
+                    
+                    
+                    if(f1.isInEmptyCell())
+                    {
+                        int success=0,fail1=0,fail2=0,fail3=0;
+                        std::vector<Feature> features;
+                        f1.findFeatures(features);
+                        for_each(features.begin(), features.end(),
+                                 [&](Feature&f2){
+                                     utils::triangluate(f1, f2, f2.point4D);
+                                 }
+                                 );
+                        //                sort(features.begin(), features.end(), [&](const Feature&fa,const Feature&fb)->bool {
+                        //                    if (fa.getDistanceToCameraCenter(rimage.cameraCenter)<fb.getDistanceToCameraCenter(rimage.cameraCenter)) {
+                        //                        return true;
+                        //                    }
+                        //                    else
+                        //                    {
+                        //                        return false;
+                        //                    }
+                        //                });
+                        PPatch bestPatch;
+                        double bestCost=-1;
+                        for (const Feature &f2:features) {
+                            
+                            if(utils::cosangle(f2.point4D, rimage->cameraCenter, f2.image->cameraCenter)<0.6)
+                            {
+                                
+                                fail1++;
+                                continue;
+                            }
+                            PPatch p=PPatch(new Patch());
+                            p->center=f2.point4D;
+                            p->normal=rimage->cameraCenter-f2.point4D;
+                            double n=norm(p->normal);
+                            
+                            p->normal=p->normal/n;
+                            p->rimage=rimage;
+                            p->updateImage(0.4, 0.4);
+                            
+                            if(p->timages.size()<=2)
+                            {
+                                fail2++;
+                                continue;
+                            }
+                            
+                            p->optimze();
+                            
+                            p->updateImage(0.4, 0.7);
+                            //p->showResult();
+                            if(p->timages.size()>=2)
+                            {
+                                /*   if (f1.x==424&&f1.y==339) {
+                                 std::cerr<<p->cost<<std::endl;
+                                 p->showResult();
+                                 }*/
+                                success++;
+                                if(p->cost>bestCost)
+                                {
+                                    bestPatch=p;
+                                    bestCost=p->cost;
+                                }
+                            }else
+                            {
+                                fail3++;
+                            }
+                            
+                        }
+                        if (bestPatch.get()!=NULL) {
+                            //这个特征点是明显的外点但是现在没办法检测
+                            /*if (f1.x==439&&f1.y==290) {
+                             bestPatch->showResult();
+                             }*/
+                            //std::cerr<<"best:"<<bestPatch->center(0,0)<<" "<<bestPatch->center(1,0)<<" "<<bestPatch->center(2,0)<<std::endl;
+                            m.lock();
+                            patches.push_back(bestPatch);
+                            int pid=(int)patches.size()-1;
+                            m.unlock();
+                            bestPatch->updateImageCell(pid);
+                            
+                        }
+                        //输出特征点重建情况，
+                        //std::cerr<<"特征点位置:("<<rimage->id<<","<<f1.x<<","<<f1.y<<"),total:"<<features.size()<<",fail:"<<(fail1+fail2+fail3)<<",success:"<<success<<std::endl;
+                    }
+                    
+                    
+                    
+                    
+                }
+                
             }
-            
-            
-            
-            
-        }
-        
-        finish=clock();
-        std::cerr<<"耗时"<<(double)(finish-start)/CLOCKS_PER_SEC<<"s"<<std::endl;
-        savePatches("a.ply");
+        }));
     }
-    
+    for(auto &t:threads)
+    {
+        t.join();
+    }
+    end= std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double>  time_span = std::chrono::duration_cast<std::chrono::duration<double>>(end-start);
+    std::cerr<<"耗时"<<time_span.count()<<"s"<<std::endl;
+    savePatches("a.ply");
 }
 
 void Sparse::savePatches(const std::string &fileName)

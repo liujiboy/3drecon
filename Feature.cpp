@@ -10,7 +10,12 @@
 #include "Utils.hpp"
 bool Feature::isInEmptyCell()const
 {
-    return image->qt[y/2][x/2].empty();
+    int row=y/2;
+    int col=x/2;
+    //image->cellLock[row][col]->lock();
+    bool ret=image->qt[row][col].empty();
+    //image->cellLock[row][col]->unlock();
+    return ret;
     //return image->qt[y/2][x/2].empty()&&image->qf[y/2][x/2].empty();
 }
 Mat3x1 Feature::toHomogeneous()const

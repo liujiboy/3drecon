@@ -23,6 +23,7 @@ Image::Image(const std::string&fileName,int i,const cv::Mat_<double>& k,const cv
     cameraCenter=cv::Mat(hc);
     qf.resize(row/2,std::vector<std::set<int>>(col/2));
     qt.resize(row/2,std::vector<std::set<int>>(col/2));
+    //cellLock.resize(row/2,std::vector<std::shared_ptr<std::mutex>>(col/2,std::shared_ptr<std::mutex>(new std::mutex)));
     depth.resize(row/2,std::vector<int>(col/2,-1));
     
     xaxis(0,0)=rt(0,0);
@@ -56,7 +57,7 @@ void Image::detectFeatures()
     cv::Mat dst;
     cv::cvtColor(data, dst, cv::COLOR_BGR2GRAY);
     cv::goodFeaturesToTrack(dst, corners, 400, 0.04, 10);
-    std::cerr<<"图像"<<id<<"检测到特征点"<<corners.size()<<std::endl;
+    //std::cerr<<"图像"<<id<<"检测到特征点"<<corners.size()<<std::endl;
     for (int i=0; i<corners.size(); i++) {
                 Feature f;
                 f.image=this;
