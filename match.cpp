@@ -22,8 +22,10 @@ int main()
     
    // Sparse sparse("../../images/templeRing/","templeR_par.txt","vis.dat");
     Sparse sparse("/Users/liuji/Projects/3drecon/data/","templeR_par.txt","vis.dat",10);
+    
    // Sparse sparse("/Users/liuji/Projects/doc/Furukawa2006/images/temple/","temple_par.txt","vis.dat",10);
    // Sparse sparse("../../images/templeSparseRing/templeSR_par.txt","../../images/templeSparseRing/");
     sparse.buildPatches();
+    sparse.saveResult("patches.txt");
 
 }

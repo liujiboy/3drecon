@@ -8,6 +8,7 @@
 
 #include "Patch.hpp"
 #include "Utils.hpp"
+#include <algorithm>
  void Patch::updateImage(double alpha1,double alpha2)
 {
     timages.clear();
@@ -47,11 +48,15 @@
     double fx=rimage->xaxis.dot(normal);
     double fy=rimage->yaxis.dot(normal);
     double fz=rimage->zaxis.dot(normal);
-    alpha=asin(fy);
+
+    alpha=std::asin(std::max(-1.0, std::min(1.0, fy)));
     double cosAlpha=cos(alpha);
     double sinBeta=fx/cosAlpha; //fx=sinβ*cosα
     double cosBeta=-fz/cosAlpha; //-fz=cosβ*cosα
-    beta=acos(cosBeta);
+    
+    beta=std::acos(std::max(-1.0, std::min(1.0, cosBeta)));
+//    if(std::isnan(beta))
+//        std::cout<<""<<std::endl;
     if (sinBeta<0) {
         beta=-beta;
     }
@@ -81,8 +86,9 @@
     cv::Vec3d yaxis=zaxis.cross(xaxis);
     yaxis=yaxis/norm(yaxis);
     xaxis=yaxis.cross(zaxis);
-    double depth=norm(center-image.cameraCenter);
-    double scale=2*depth/(image.kmat(0,0)+image.kmat(1,1));
+    //double depth=norm(center-image.cameraCenter);
+    //double scale=2*depth/(image.kmat(0,0)+image.kmat(1,1));
+    double scale=getUnit();
     pxaxis(0,0)=xaxis[0];
     pxaxis(1,0)=xaxis[1];
     pxaxis(2,0)=xaxis[2];
@@ -95,8 +101,8 @@
     pyaxis=pyaxis*scale;
     double xdis=norm(image.project(center+pxaxis)-image.project(center));
     double ydis=norm(image.project(center+pyaxis)-image.project(center));
-    pxaxis=pxaxis/xdis*2;
-    pyaxis=pyaxis/ydis*2;
+    pxaxis=pxaxis/xdis;
+    pyaxis=pyaxis/ydis;
     
 }
 
@@ -134,7 +140,7 @@ double optimizeFun(const std::vector<double> &x, std::vector<double> &grad, void
     Patch *oldP=(Patch*)fdata;
     p.timages=oldP->timages;
     p.rimage=oldP->rimage;
-    p.ray=p.ray;
+    p.ray=oldP->ray;
     p.decode(x[0], x[1], x[2]);
     
     double ret=p.averageCost();
@@ -186,6 +192,26 @@ void Patch::optimze()
         }
     }
     
+}
+bool Patch::isImageCellEmpty()const
+{
+    int row,col;
+    Mat3x1 coord=rimage->project(this->center);
+    row=coord(1,0)/2;
+    col=coord(0,0)/2;
+    if (!rimage->qt[row][col].empty()) {
+        return false;
+    }
+    for(Image *timage:timages)
+    {
+        coord=timage->project(this->center);
+        row=coord(1,0)/2;
+        col=coord(0,0)/2;
+        if (!timage->qt[row][col].empty()) {
+            return false;
+        }
+    }
+    return true;
 }
 void Patch::updateImageCell(int pid)
 {
@@ -242,5 +268,80 @@ void Patch::showResult()
         cv::waitKey();
         
     }
+
+}
+double Patch::getUnit() const
+{
+    double fz=rimage->getDistanceToCameraCenter(this->center);
+    double fx=rimage->kmat(0,0);
+    double fy=rimage->kmat(1,1);
+    return 2*fz/(fx+fy);
+}
+void Patch::updateScale()
+{
+    scale=0;
+    const double unit=getUnit();
+    const double unit2 = 2.0f * unit;
+    double totalDiff=0;
+//    for (Image *image:timages) {
+//        double diff=norm(image->project(this->center)-image->project(this->center-ray*unit2));
+//        totalDiff += diff;
+//    }
+    for (Image *image:simages) {
+        double diff=norm(image->project(this->center)-image->project(this->center-ray*unit2));
+        totalDiff += diff;
+    }
+    totalDiff /= simages.size() - 1;
+    scale=unit2/totalDiff;
+}
+bool Patch::isNeighbor(const Patch&p2)const
+{
+    if (this->normal.dot(p2.normal) < cos(120.0 * M_PI / 180.0))
+        return false;
+    Mat4x1 diff=this->center-p2.center;
+    
+    const double vunit = this->scale + p2.scale;
+    
+    const double f0 = this->normal.dot(diff);
+    const double f1 = p2.normal.dot(diff);
+    double ftmp = (fabs(f0) + fabs(f1)) / 2.0;
+    ftmp /= vunit; //像素/距离，距离是unit2
+    
+//    // this may loosen the isneighbor testing. need to tighten (decrease) threshold?
+//    const float hsize = norm(2 * diff - lhs.m_normal * f0 - rhs.m_normal * f1) / 2.0 / hunit;
+//    
+//    // radius check
+//    if (radius / hunit < hsize)
+//        return 0;
+//    
+//    if (1.0 < hsize)
+//        ftmp /= min(2.0f, hsize);
+    
+    if (ftmp < 4)
+        return true;
+    else
+        return false;
+}
+void Patch:: intersect(const Image&image,double x,double y,Mat4x1&point)const
+{
+    //create new Patch;
+    Mat3x1 p2d;
+    p2d(0,0)=x;
+    p2d(1,0)=y;
+    p2d(2,0)=1;
+    Mat4x1 p3d;
+    cv::Mat pinvP=utils::pinv(image.pmat);
+    p3d=pinvP*p2d;
+    p3d=p3d/p3d(3,0);
+    //std::cout<<p03d<<std::endl;
+    Mat4x1 u=p3d-image.cameraCenter;
+    u=u/cv::norm(u);
+    //std::cout<<u<<std::endl;
+    double t=(normal.dot(center)-normal.dot(image.cameraCenter))/(normal.dot(u));
+    //std::cout<<t<<std::endl;
+    point=image.cameraCenter+t*u;
+    //std::cout<<p13d<<std::endl;
+    //std::cout<<p.normal.dot(p13d-p.center)<<std::endl;
+    //std::cout<<u.dot(p13d-timage->cameraCenter)<<std::endl;
 
 }

@@ -21,10 +21,13 @@ Image::Image(const std::string&fileName,int i,const cv::Mat_<double>& k,const cv
     cv::Mat_<double> c=-rmat.t()*tmat;
     cv::Matx<double, 4, 1> hc(c(0,0),c(1,0),c(2,0),1);
     cameraCenter=cv::Mat(hc);
-    qf.resize(row/2,std::vector<std::set<int>>(col/2));
-    qt.resize(row/2,std::vector<std::set<int>>(col/2));
+    gridWidth=floor((col/2.0)+0.5);
+    gridHeight=floor((row/2.0)+0.5);
+    qf.resize(gridHeight,std::vector<std::set<int>>(gridWidth));
+    qt.resize(gridHeight,std::vector<std::set<int>>(gridWidth));
+    searched.resize(gridHeight,std::vector<bool>(gridWidth,false));
     //cellLock.resize(row/2,std::vector<std::shared_ptr<std::mutex>>(col/2,std::shared_ptr<std::mutex>(new std::mutex)));
-    depth.resize(row/2,std::vector<int>(col/2,-1));
+    depth.resize(gridHeight,std::vector<int>(gridWidth,-1));
     
     xaxis(0,0)=rt(0,0);
     xaxis(1,0)=rt(0,1);

@@ -14,8 +14,8 @@
 Sparse::Sparse(const std::string&dir,const std::string&parFile,const std::string&visFile,int n):nThread(n)
 {
     
-    loadImages(dir, parFile);
-    loadVisData(dir,visFile);
+    utils::loadImages(dir, parFile,images);
+    utils::loadVisData(dir,visFile,images);
     detectFeatures();
 }
 void Sparse::detectFeatures()
@@ -57,48 +57,48 @@ void Sparse::detectFeatures()
     }
 
 }
-void Sparse::loadVisData(const std::string&dir,const std::string&visFile)
-{
-    std::cerr<<"加载可见性数据";
-    std::ifstream vis((dir+visFile).c_str());
-    std::string header;
-    int num;
-    vis>>header>>num;
-    for (int i=0; i<num; i++) {
-        std::cerr<<"*";
-        int index1,index2,index2Size;
-        vis>>index1>>index2Size;
-        for(int j=0;j<index2Size;j++)
-        {
-            vis>>index2;
-            images[index1].nimages.push_back(&images[index2]);
-            Mat3x3 F;
-            utils::computeF(images[index1].pmat, images[index2].pmat, images[index1].cameraCenter, F);
-            images[index1].F.push_back(F);
-        }
-    }
-    std::cerr<<std::endl;
-    
-}
-void Sparse::loadImages(const std::string&dir,const std::string&parFile)
-{
-    std::cerr<<"加载图像中:";
-    std::ifstream fin((dir+parFile).c_str());
-    int n;
-    fin>>n;
-    //images.resize(n);
-    for(int i=0;i<n;i++)
-    {
-        std::cerr<<"*";
-        std::string name;
-        cv::Mat_<double> k(3,3);
-        cv::Mat_<double> rt(3,4);
-        fin>>name>>k(0,0)>>k(0,1)>>k(0,2)>>k(1,0)>>k(1,1)>>k(1,2)>>k(2,0)>>k(2,1)>>k(2,2)>>rt(0,0)>>rt(0,1)>>rt(0,2)>>rt(1,0)>>rt(1,1)>>rt(1,2)>>rt(2,0)>>rt(2,1)>>rt(2,2)>>rt(0,3)>>rt(1,3)>>rt(2,3);
-        images.push_back(Image(dir+name,i,k,rt));
-    }
-    std::cerr<<std::endl;
-    
-}
+//void Sparse::loadVisData(const std::string&dir,const std::string&visFile)
+//{
+//    std::cerr<<"加载可见性数据";
+//    std::ifstream vis((dir+visFile).c_str());
+//    std::string header;
+//    int num;
+//    vis>>header>>num;
+//    for (int i=0; i<num; i++) {
+//        std::cerr<<"*";
+//        int index1,index2,index2Size;
+//        vis>>index1>>index2Size;
+//        for(int j=0;j<index2Size;j++)
+//        {
+//            vis>>index2;
+//            images[index1].nimages.push_back(&images[index2]);
+//            Mat3x3 F;
+//            utils::computeF(images[index1].pmat, images[index2].pmat, images[index1].cameraCenter, F);
+//            images[index1].F.push_back(F);
+//        }
+//    }
+//    std::cerr<<std::endl;
+//    
+//}
+//void Sparse::loadImages(const std::string&dir,const std::string&parFile)
+//{
+//    std::cerr<<"加载图像中:";
+//    std::ifstream fin((dir+parFile).c_str());
+//    int n;
+//    fin>>n;
+//    //images.resize(n);
+//    for(int i=0;i<n;i++)
+//    {
+//        std::cerr<<"*";
+//        std::string name;
+//        cv::Mat_<double> k(3,3);
+//        cv::Mat_<double> rt(3,4);
+//        fin>>name>>k(0,0)>>k(0,1)>>k(0,2)>>k(1,0)>>k(1,1)>>k(1,2)>>k(2,0)>>k(2,1)>>k(2,2)>>rt(0,0)>>rt(0,1)>>rt(0,2)>>rt(1,0)>>rt(1,1)>>rt(1,2)>>rt(2,0)>>rt(2,1)>>rt(2,2)>>rt(0,3)>>rt(1,3)>>rt(2,3);
+//        images.push_back(Image(dir+name,i,k,rt));
+//    }
+//    std::cerr<<std::endl;
+//    
+//}
 
 
 void Sparse::buildPatches()
@@ -216,10 +216,11 @@ void Sparse::buildPatches()
                              }*/
                             //std::cerr<<"best:"<<bestPatch->center(0,0)<<" "<<bestPatch->center(1,0)<<" "<<bestPatch->center(2,0)<<std::endl;
                             m.lock();
-                            patches.push_back(bestPatch);
-                            int pid=(int)patches.size()-1;
-                            m.unlock();
+                            int pid=(int)patches.size();
                             bestPatch->updateImageCell(pid);
+                            patches.push_back(bestPatch);
+                            m.unlock();
+                            
                             
                         }
                         //输出特征点重建情况，
@@ -246,37 +247,71 @@ void Sparse::buildPatches()
 
 void Sparse::savePatches(const std::string &fileName)
 {
-    std::ofstream fout(fileName);
-    
-    fout<<"ply"<<std::endl;
-    fout<<"format ascii 1.0"<<std::endl;
-    fout<<"element vertex "<<patches.size()<<std::endl;
-    fout<<"property float x"<<std::endl;
-    fout<<"property float y"<<std::endl;
-    fout<<"property float z"<<std::endl;
-    fout<<"property uchar diffuse_red"<<std::endl;
-    fout<<"property uchar diffuse_green"<<std::endl;
-    fout<<"property uchar diffuse_blue"<<std::endl;
-    fout<<"end_header"<<std::endl;
-    for (int i=0; i<patches.size(); i++) {
-        Mat4x1 center=patches[i]->center;
-        double r=0,g=0,b=0;
-        for(Image *image:patches[i]->timages)
+    utils::savePatches(patches, fileName);
+}
+void toString(const std::vector<std::vector<std::set<int> > >&q,int&count,std::string&str)
+{
+    count=0;
+    std::stringstream ss;
+    for (int i=0; i<q.size(); i++) {
+        for(int j=0;j<q[i].size();j++)
         {
-            
-            Mat3x1 x=image->project(center);
-            cv::Mat patch;
-            getRectSubPix(image->data, cv::Size(1,1), cv::Point2d(x(0,0),x(1,0)), patch);
-            b+=patch.at<cv::Vec3b>(0, 0)[0];
-            g+=patch.at<cv::Vec3b>(0, 0)[1];
-            r+=patch.at<cv::Vec3b>(0, 0)[2];
+            if(q[i][j].size()>0)
+            {
+                ss<<i<<" "<<j<<" "<<q[i][j].size()<<" ";
+                for (int id:q[i][j]) {
+                    ss<<id<<" ";
+                }
+                ss<<std::endl;
+                count++;
+            }
         }
-        r/=patches[i]->timages.size();
-        g/=patches[i]->timages.size();
-        b/=patches[i]->timages.size();
-        fout<<center(0,0)<<" "<<center(1,0)<<" "<<center(2,0)<<" "<<(int)r<<" "<<(int)g<<" "<<(int)b<<std::endl;
     }
-    fout.close();
-    std::cerr<<"保存结束"<<std::endl;
+    str=ss.str();
+
+}
+void Sparse::saveResult(const std::string&fileName)
+{
+    std::ofstream ofs(fileName.c_str());
+    std::cerr<<"保存Qf和Qt"<<std::endl;
+    ofs<<images.size()<<std::endl; //图像数量
+   // ofs<<"**********Qf和Qt***************"<<std::endl;
+    for (Image &image:images) {
+        int count=0;
+        std::string str;
+        toString(image.qf,count,str);
+        ofs<<count<<std::endl; //Qf
+        ofs<<str;
+        toString(image.qt,count,str);
+        ofs<<count<<std::endl; //Qt
+        ofs<<str;
+    }
+   // ofs<<"***********patches**************"<<std::endl;
+    std::map<Image*,int> m;
+    for(int i=0;i<images.size();i++)
+    {
+        m[&images[i]]=i;
+    }
+    ofs<<patches.size()<<std::endl; //patch数量
+    for (PPatch p:patches) {
+       // ofs<<"**********p***************"<<std::endl;
+        ofs<<p->center(0,0)<<" "<<p->center(1,0)<<" "<<p->center(2,0)<<std::endl;
+        ofs<<p->normal(0,0)<<" "<<p->normal(1,0)<<" "<<p->normal(2,0)<<std::endl;
+        ofs<<p->ray(0,0)<<" "<<p->ray(1,0)<<" "<<p->ray(2,0)<<std::endl;
+        ofs<<p->cost<<std::endl;
+        ofs<<m[p->rimage]<<std::endl; //rimage index
+        ofs<<p->simages.size()<<" ";
+        for (Image *simage:p->simages) {
+            ofs<<m[simage]<<" ";
+        }
+        ofs<<std::endl;
+        ofs<<p->timages.size()<<" ";
+        for (Image *timage:p->timages) {
+            ofs<<m[timage]<<" ";
+        }
+        ofs<<std::endl;
+
+    }
+    ofs.close();
 }
 

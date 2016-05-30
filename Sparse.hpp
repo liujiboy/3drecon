@@ -20,13 +20,14 @@ class Sparse{
 private:
     std::vector<Image> images;
     std::vector<PPatch> patches;
-    void loadImages(const std::string&dir,const std::string&parFile);
-    void loadVisData(const std::string&dir,const std::string&visFile);
+    //void loadImages(const std::string&dir,const std::string&parFile);
+    //void loadVisData(const std::string&dir,const std::string&visFile);
     void detectFeatures();
     int nThread;
 public:
     Sparse(const std::string&dir,const std::string&parFile,const std::string&visFile,int n=20);
     void buildPatches();
     void savePatches(const std::string&fileName);
+    void saveResult(const std::string&fileName);
 };
 #endif /* Sparse_hpp */

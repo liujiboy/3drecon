@@ -16,6 +16,8 @@
 #include "Matmxn.hpp"
 
 class Patch{
+private:
+    double getUnit()const;
 public:
     Mat4x1 center;
     Mat4x1 normal;
@@ -32,6 +34,12 @@ public:
     void updateImageCell(int pid);
     void showResult();
     double cost;
+    double scale;
+    void updateScale();
+    bool isNeighbor(const Patch&p2)const;
+    void intersect(const Image&image,double x,double y,Mat4x1&point)const ;
+    bool isImageCellEmpty()const;
+
        //double cost(const Image&i,const Image&j);
     //void getXYAxis(const ImageSet&imageSet,Vec3d&xAxis,Vec3d&yAxis);
     //friend ostream&operator<<(ostream&os,const Patch&p);
