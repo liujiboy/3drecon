@@ -15,7 +15,7 @@
 #include "Tex.hpp"
 #include <fstream>
 #include <string>
-
+#include <mutex>
 class Sparse{
 private:
     std::vector<Image> images;
