@@ -42,12 +42,12 @@ void loadPatches(const std::string&dir,const std::string&patchFile,std::vector<I
     ifs>>nPatches;
     for (int i=0; i<nPatches; i++) {
         PPatch p(new Patch());
-        ifs>>p->center(0,0)>>p->center(1,0)>>p->center(2,0);
-        p->center(3,0)=1;
-        ifs>>p->normal(0,0)>>p->normal(1,0)>>p->normal(2,0);
-        p->normal(3,0)=0;
-        ifs>>p->ray(0,0)>>p->ray(1,0)>>p->ray(2,0);
-        p->ray(3,0)=0;
+        ifs>>p->center[0]>>p->center[1]>>p->center[2];
+        p->center[3]=1;
+        ifs>>p->normal[0]>>p->normal[1]>>p->normal[2];
+        p->normal[3]=0;
+        ifs>>p->ray[0]>>p->ray[1]>>p->ray[2];
+        p->ray[3]=0;
         ifs>>p->cost;
         int rimage;
         ifs>>rimage;
@@ -72,19 +72,20 @@ void loadPatches(const std::string&dir,const std::string&patchFile,std::vector<I
         patches.push_back(p);
     }
 }
-void expandPatch(const PPatch&p,std::vector<PPatch>&patches,std::queue<PPatch>&patchQueue)
+void expandPatch(const PPatch&p,std::vector<PPatch>&patches,std::priority_queue<PPatch,std::vector<PPatch>,P_compare> &patchQueue)
 {
+    int scale=1;
     std::vector<Image *> timages;
     //std::vector<Image *> timages=p.timages;
     timages.insert(timages.begin(), p->rimage);
     for (Image *timage:timages) {
-        Mat3x1 point=timage->project(p->center);
-        int col=point(0,0)/2;
-        int row=point(1,0)/2;
+        cv::Vec3d point=timage->project(p->center);
+        int col=point[0]/2;
+        int row=point[1]/2;
         if(col<0||col>=timage->gridWidth||row<0||row>=timage->gridHeight)
             continue;
         for (int i=-1; i<=1; i++) {
-            int x=col+i;
+            int x=col+i*scale;
             if(x<0||x>=timage->gridWidth)
                 continue;
             for(int j=-1;j<=1;j++)
@@ -93,7 +94,7 @@ void expandPatch(const PPatch&p,std::vector<PPatch>&patches,std::queue<PPatch>&p
                     continue;
                 }
                 
-                int y=row+j;
+                int y=row+j*scale;
                 if (y<0||y>=timage->gridHeight) {
                     continue;
                 }
@@ -120,7 +121,7 @@ void expandPatch(const PPatch&p,std::vector<PPatch>&patches,std::queue<PPatch>&p
                         continue;
                 }
                 //create new Patch;
-                Mat4x1 newCenter;
+                cv::Vec4d newCenter;
                 p->intersect(*timage, x*2+1, y*2+1, newCenter);
                 //std::cout<<newCenter<<std::endl;
                 PPatch newPatch(new Patch());
@@ -137,7 +138,7 @@ void expandPatch(const PPatch&p,std::vector<PPatch>&patches,std::queue<PPatch>&p
                     newPatch->updateImageCell(pid);
                     patches.push_back(newPatch);
                     patchQueue.push(newPatch);
-                 //  newPatch.showResult();
+                   //newPatch->showResult();
                 }else
                 {
                     //std::cout<<newPatch->isImageCellEmpty()<<std::endl;
@@ -157,6 +158,9 @@ void expandPatch(const PPatch&p,std::vector<PPatch>&patches,std::queue<PPatch>&p
 }
 int main(int argc,char* argv[])
 {
+    std::chrono::high_resolution_clock::time_point start,end;
+    start= std::chrono::high_resolution_clock::now();
+
     std::vector<Image> images;
     std::vector<PPatch> patches;
     utils::loadImages("/Users/liuji/Projects/3drecon/data/","templeR_par.txt",images);
@@ -167,15 +171,16 @@ int main(int argc,char* argv[])
         p->updateScale();
        // std::cout<<p.scale<<std::endl;
     }
-    std::queue<PPatch> patchQueue;
+    std::priority_queue<PPatch,std::vector<PPatch>,P_compare> patchQueue;
     for (PPatch p:patches) {
         patchQueue.push(p);
     }
     int n=1000;
     while (!patchQueue.empty()) {
-        PPatch p=patchQueue.front();
+        PPatch p=patchQueue.top();
         patchQueue.pop();
         std::cerr<<patchQueue.size()<<",";
+       // p->showResult();
         expandPatch(p,patches,patchQueue);
         std::cerr<<patchQueue.size()<<std::endl;
         if(patches.size()>n)
@@ -185,4 +190,7 @@ int main(int argc,char* argv[])
         }
     }
     utils::savePatches(patches, "a.ply");
+    end= std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double>  time_span = std::chrono::duration_cast<std::chrono::duration<double>>(end-start);
+    std::cerr<<"耗时"<<time_span.count()<<"s"<<std::endl;
 }

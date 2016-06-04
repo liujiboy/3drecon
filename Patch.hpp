@@ -19,15 +19,15 @@ class Patch{
 private:
     double getUnit()const;
 public:
-    Mat4x1 center;
-    Mat4x1 normal;
-    Mat4x1 ray;
+    cv::Vec4d center;
+    cv::Vec4d normal;
+    cv::Vec4d ray;
     Image* rimage; //reference image
     std::vector<Image*> simages; //S(p)
     std::vector<Image*> timages; //T(p)
     void encode(double &depth, double &alpha, double &beta)const;
     void decode(double depth, double alpha, double beta);
-    void getPAxes( Mat4x1 &pxaxis, Mat4x1 &pyaxis)const ;
+    void getPAxes( cv::Vec4d &pxaxis, cv::Vec4d &pyaxis)const ;
     double averageCost()const;
     void optimze();
     void updateImage(double alpha1,double alpha2);
@@ -37,7 +37,7 @@ public:
     double scale;
     void updateScale();
     bool isNeighbor(const Patch&p2)const;
-    void intersect(const Image&image,double x,double y,Mat4x1&point)const ;
+    void intersect(const Image&image,double x,double y,cv::Vec4d&point)const ;
     bool isImageCellEmpty()const;
 
        //double cost(const Image&i,const Image&j);
@@ -45,4 +45,10 @@ public:
     //friend ostream&operator<<(ostream&os,const Patch&p);
 };
 typedef  std::shared_ptr<Patch> PPatch;
+class P_compare {
+public:
+    inline bool operator()(const PPatch& lhs, const PPatch& rhs) const {
+        return lhs->cost < rhs->cost;
+    }
+};
 #endif /* Patch_hpp */

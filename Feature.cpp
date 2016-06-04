@@ -26,7 +26,7 @@ Mat3x1 Feature::toHomogeneous()const
     m(2,0)=1;
     return m;
 }
-double Feature::getDistanceToCameraCenter(const Mat4x1 &cameraCenter)const
+double Feature::getDistanceToCameraCenter(const cv::Vec4d &cameraCenter)const
 {
     return norm(cameraCenter-point4D);
 }

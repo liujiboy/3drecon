@@ -216,6 +216,7 @@ void Sparse::buildPatches()
                              }*/
                             //std::cerr<<"best:"<<bestPatch->center(0,0)<<" "<<bestPatch->center(1,0)<<" "<<bestPatch->center(2,0)<<std::endl;
                             m.lock();
+                            //bestPatch->showResult();
                             int pid=(int)patches.size();
                             bestPatch->updateImageCell(pid);
                             patches.push_back(bestPatch);
@@ -295,9 +296,9 @@ void Sparse::saveResult(const std::string&fileName)
     ofs<<patches.size()<<std::endl; //patch数量
     for (PPatch p:patches) {
        // ofs<<"**********p***************"<<std::endl;
-        ofs<<p->center(0,0)<<" "<<p->center(1,0)<<" "<<p->center(2,0)<<std::endl;
-        ofs<<p->normal(0,0)<<" "<<p->normal(1,0)<<" "<<p->normal(2,0)<<std::endl;
-        ofs<<p->ray(0,0)<<" "<<p->ray(1,0)<<" "<<p->ray(2,0)<<std::endl;
+        ofs<<p->center[0]<<" "<<p->center[1]<<" "<<p->center[2]<<std::endl;
+        ofs<<p->normal[0]<<" "<<p->normal[1]<<" "<<p->normal[2]<<std::endl;
+        ofs<<p->ray[0]<<" "<<p->ray[1]<<" "<<p->ray[2]<<std::endl;
         ofs<<p->cost<<std::endl;
         ofs<<m[p->rimage]<<std::endl; //rimage index
         ofs<<p->simages.size()<<" ";

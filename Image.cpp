@@ -16,6 +16,9 @@ Image::Image(const std::string&fileName,int i,const cv::Mat_<double>& k,const cv
     kmat=k;
     rtmat=rt;
     pmat=k*rt;
+    pvec[0]=cv::Vec4d(pmat(0,0),pmat(0,1),pmat(0,2),pmat(0,3));
+    pvec[1]=cv::Vec4d(pmat(1,0),pmat(1,1),pmat(1,2),pmat(1,3));
+    pvec[2]=cv::Vec4d(pmat(2,0),pmat(2,1),pmat(2,2),pmat(2,3));
     rmat=rt(cv::Rect(0,0,3,3));
     tmat=rt(cv::Rect(3,0,1,3));
     cv::Mat_<double> c=-rmat.t()*tmat;
@@ -29,18 +32,18 @@ Image::Image(const std::string&fileName,int i,const cv::Mat_<double>& k,const cv
     //cellLock.resize(row/2,std::vector<std::shared_ptr<std::mutex>>(col/2,std::shared_ptr<std::mutex>(new std::mutex)));
     depth.resize(gridHeight,std::vector<int>(gridWidth,-1));
     
-    xaxis(0,0)=rt(0,0);
-    xaxis(1,0)=rt(0,1);
-    xaxis(2,0)=rt(0,2);
-    xaxis(3,0)=0;
-    yaxis(0,0)=rt(1,0);
-    yaxis(1,0)=rt(1,1);
-    yaxis(2,0)=rt(1,2);
-    yaxis(3,0)=0;
-    zaxis(0,0)=rt(2,0);
-    zaxis(1,0)=rt(2,1);
-    zaxis(2,0)=rt(2,2);
-    zaxis(3,0)=0;
+    xaxis[0]=rt(0,0);
+    xaxis[1]=rt(0,1);
+    xaxis[2]=rt(0,2);
+    xaxis[3]=0;
+    yaxis[0]=rt(1,0);
+    yaxis[1]=rt(1,1);
+    yaxis[2]=rt(1,2);
+    yaxis[3]=0;
+    zaxis[0]=rt(2,0);
+    zaxis[1]=rt(2,1);
+    zaxis[2]=rt(2,2);
+    zaxis[3]=0;
 
 }
 void Image::detectFeatures()
@@ -106,34 +109,34 @@ void Image::detectFeatures()
 //
 //    }
 //}
-double Image::getDistanceToCameraCenter(const Mat4x1 &point)const
+double Image::getDistanceToCameraCenter(const cv::Vec4d &point)const
 {
     return norm(cameraCenter-point);
 }
-Mat3x1 Image::project(const Mat4x1 &point)const
+cv::Vec3d Image::project(const cv::Vec4d &point)const
 {
-    Mat3x1 m=pmat*point;
-    //cout<<m(2,0)<<endl;
-    m=m/m(2,0);
-    //m=m/10;
-    //cout<<m<<endl;
+    cv::Vec3d m;
+    m[2]=pvec[2].dot(point);
+    m[0]=pvec[0].dot(point)/m[2];
+    m[1]=pvec[1].dot(point)/m[2];
+    m[2]=1;
     return m;
 }
-void Image::grabTex(const Mat4x1 coord,const Mat4x1&pxaxis,const Mat4x1&pyaxis,Tex&pTex)const
+void Image::grabTex(const cv::Vec4d coord,const cv::Vec4d&pxaxis,const cv::Vec4d&pyaxis,Tex&pTex)const
 {
     //pTex.points.clear();
     //pTex.values.clear();
-    Mat3x1 center=project(coord);
-    Mat3x1 dx=project(coord+pxaxis)-center;
-    Mat3x1 dy=project(coord+pyaxis)-center;
+    cv::Vec3d center=project(coord);
+    cv::Vec3d dx=project(coord+pxaxis)-center;
+    cv::Vec3d dy=project(coord+pyaxis)-center;
     int k=0;
     for(int i=-3;i<=3;i++)
         for(int j=-3;j<=3;j++)
         {
-            Mat3x1 p=center+j*dx+i*dy;
+            cv::Vec3d p=center+j*dx+i*dy;
             cv::Mat v1,v2;
-            double px=p(0,0);
-            double py=p(1,0);
+            double px=p[0];
+            double py=p[1];
             if (px<0||px>data.cols-1||py<0||py>data.rows-1||std::isnan(px)||std::isnan(py)) {
                 //pTex.values.push_back(-1);
                 //pTex.values.push_back(-1);

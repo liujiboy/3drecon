@@ -25,7 +25,7 @@ private:
     void detectFeatures();
     int nThread;
 public:
-    Sparse(const std::string&dir,const std::string&parFile,const std::string&visFile,int n=20);
+    Sparse(const std::string&dir,const std::string&parFile,const std::string&visFile,int n=1);
     void buildPatches();
     void savePatches(const std::string&fileName);
     void saveResult(const std::string&fileName);

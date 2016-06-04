@@ -18,8 +18,8 @@ public:
     Image *image;
     double x;
     double y;
-    Mat4x1 point4D;
-    double getDistanceToCameraCenter(const Mat4x1&cameraCenter) const;//distance to camera center
+    cv::Vec4d point4D;
+    double getDistanceToCameraCenter(const cv::Vec4d&cameraCenter) const;//distance to camera center
     bool isInEmptyCell()const;
     Mat3x1 toHomogeneous()const;
     void findFeatures(std::vector<Feature>&featuresNearEpipolarLine)const;

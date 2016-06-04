@@ -14,7 +14,7 @@
     timages.clear();
     simages.clear();
     Tex pTex1;
-    Mat4x1 pxaxis,pyaxis;
+    cv::Vec4d pxaxis,pyaxis;
     getPAxes(pxaxis, pyaxis);
     rimage->grabTex(center,pxaxis,pyaxis,pTex1);
     
@@ -74,33 +74,37 @@
     double fz=-cos(beta)*cos(alpha);
     
     normal=fx*rimage->xaxis+fy*rimage->yaxis+fz*rimage->zaxis;
-    normal(3,0)=0;
+    normal[3]=0;
     center=rimage->cameraCenter+ray*depth;
 }
- void Patch::getPAxes(Mat4x1 &pxaxis, Mat4x1 &pyaxis)const
+ void Patch::getPAxes(cv::Vec4d &pxaxis, cv::Vec4d &pyaxis)const
 {
     
     Image &image=*rimage;
-    cv::Vec3d zaxis(normal(0,0),normal(1,0),normal(2,0));
-    cv::Vec3d xaxis=cv::Vec3d(image.xaxis(0,0),image.xaxis(1,0),image.xaxis(2,0));
+    cv::Vec3d zaxis(normal[0],normal[1],normal[2]);
+    cv::Vec3d xaxis=cv::Vec3d(image.xaxis[0],image.xaxis[1],image.xaxis[2]);
     cv::Vec3d yaxis=zaxis.cross(xaxis);
     yaxis=yaxis/norm(yaxis);
     xaxis=yaxis.cross(zaxis);
     //double depth=norm(center-image.cameraCenter);
     //double scale=2*depth/(image.kmat(0,0)+image.kmat(1,1));
     double scale=getUnit();
-    pxaxis(0,0)=xaxis[0];
-    pxaxis(1,0)=xaxis[1];
-    pxaxis(2,0)=xaxis[2];
-    pxaxis(3,0)=0;
-    pyaxis(0,0)=yaxis[0];
-    pyaxis(1,0)=yaxis[1];
-    pyaxis(2,0)=yaxis[2];
-    pyaxis(3,0)=0;
+    pxaxis[0]=xaxis[0];
+    pxaxis[1]=xaxis[1];
+    pxaxis[2]=xaxis[2];
+    pxaxis[3]=0;
+    pyaxis[0]=yaxis[0];
+    pyaxis[1]=yaxis[1];
+    pyaxis[2]=yaxis[2];
+    pyaxis[3]=0;
     pxaxis=pxaxis*scale;
     pyaxis=pyaxis*scale;
+  
+
     double xdis=norm(image.project(center+pxaxis)-image.project(center));
     double ydis=norm(image.project(center+pyaxis)-image.project(center));
+    
+
     pxaxis=pxaxis/xdis;
     pyaxis=pyaxis/ydis;
     
@@ -111,13 +115,17 @@
     if (timages.size()==0) {
         return -1;
     }
-    Tex pTex1;
-    Mat4x1 pxaxis,pyaxis;
-    getPAxes(pxaxis, pyaxis);
     
+    Tex pTex1;
+    cv::Vec4d pxaxis,pyaxis;
+//    std::chrono::high_resolution_clock::time_point start,end;
+//    start= std::chrono::high_resolution_clock::now();
+    getPAxes(pxaxis, pyaxis);
+//    end= std::chrono::high_resolution_clock::now();
+//    std::chrono::duration<double>  time_span = std::chrono::duration_cast<std::chrono::duration<double> >(end-start);
+//    std::cerr<<"耗时"<<time_span.count()<<"s"<<std::endl;
     rimage->grabTex(center,pxaxis,pyaxis,pTex1);
-   
-    double sum=0;
+        double sum=0;
     //TODO nimages还是timages？
     for(Image *timage:timages)
     {
@@ -125,6 +133,8 @@
         timage->grabTex(center, pxaxis, pyaxis, pTex2);
         sum+=pTex1.ncc(pTex2);
     }
+    
+
    
     //double ret=sum/timages.size();
     double ret=sum/timages.size()*(timages.size()-2); //为了鲁棒性，匹配的图片越多，分值越高
@@ -135,6 +145,7 @@
 double optimizeFun(const std::vector<double> &x, std::vector<double> &grad, void *fdata)
 {
    
+    
 
     Patch p;
     Patch *oldP=(Patch*)fdata;
@@ -145,11 +156,14 @@ double optimizeFun(const std::vector<double> &x, std::vector<double> &grad, void
     
     double ret=p.averageCost();
     
-    return ret;
+        return ret;
     
 }
 void Patch::optimze()
 {
+//    std::chrono::high_resolution_clock::time_point start,end;
+//    start= std::chrono::high_resolution_clock::now();
+
     double depth,alpha,beta;
     ray=center-rimage->cameraCenter;
     ray=ray/norm(ray);
@@ -184,6 +198,8 @@ void Patch::optimze()
     {
         success = false;
     }
+  
+
     if (success) {
         if(maxf>cost)
         {
@@ -191,22 +207,26 @@ void Patch::optimze()
             cost=maxf;
         }
     }
+//    end= std::chrono::high_resolution_clock::now();
+//    std::chrono::duration<double>  time_span = std::chrono::duration_cast<std::chrono::duration<double> >(end-start);
+//    std::cerr<<"耗时"<<time_span.count()<<"s"<<std::endl;
+
     
 }
 bool Patch::isImageCellEmpty()const
 {
     int row,col;
-    Mat3x1 coord=rimage->project(this->center);
-    row=coord(1,0)/2;
-    col=coord(0,0)/2;
+    cv::Vec3d coord=rimage->project(this->center);
+    row=coord[1]/2;
+    col=coord[0]/2;
     if (!rimage->qt[row][col].empty()) {
         return false;
     }
     for(Image *timage:timages)
     {
         coord=timage->project(this->center);
-        row=coord(1,0)/2;
-        col=coord(0,0)/2;
+        row=coord[1]/2;
+        col=coord[0]/2;
         if (!timage->qt[row][col].empty()) {
             return false;
         }
@@ -216,9 +236,9 @@ bool Patch::isImageCellEmpty()const
 void Patch::updateImageCell(int pid)
 {
     int row,col;
-    Mat3x1 coord=rimage->project(this->center);
-    row=coord(1,0)/2;
-    col=coord(0,0)/2;
+    cv::Vec3d coord=rimage->project(this->center);
+    row=coord[1]/2;
+    col=coord[0]/2;
     //rimage->cellLock[row][col]->lock();
     rimage->qt[row][col].insert(pid);
     //rimage->cellLock[row][col]->unlock();
@@ -227,19 +247,19 @@ void Patch::updateImageCell(int pid)
    for(Image *nimage:rimage->nimages)
     {
         coord=nimage->project(this->center);
-        row=coord(1,0)/2;
-        col=coord(0,0)/2;
+        row=coord[1]/2;
+        col=coord[0]/2;
         
         if(find(timages.begin(), timages.end(), nimage)!=timages.end())
         {
             
             //nimage->cellLock[row][col]->lock();
-            nimage->qt[coord(1,0)/2][coord(0,0)/2].insert(pid);
+            nimage->qt[row][col].insert(pid);
             //nimage->cellLock[row][col]->unlock();
         }else if(find(simages.begin(), simages.end(), nimage)!=simages.end()){
             
             //nimage->cellLock[row][col]->lock();
-            nimage->qf[coord(1,0)/2][coord(0,0)/2].insert(pid);
+            nimage->qf[row][col].insert(pid);
             //nimage->cellLock[row][col]->unlock();
         }
         
@@ -253,8 +273,8 @@ void Patch::showResult()
     
     cv::Mat im1,im2;
     image1.data.copyTo(im1);
-    Mat3x1 coord=image1.project(center);
-    cv::circle(im1, cv::Point2d(coord(0,0),coord(1,0)),5, cv::Scalar(0,0,255));
+    cv::Vec3d coord=image1.project(center);
+    cv::circle(im1, cv::Point2d(coord[0],coord[1]),5, cv::Scalar(0,0,255));
     cv::namedWindow("im1");
     cv::namedWindow("im2");
     cv::imshow("im1", im1);
@@ -263,7 +283,7 @@ void Patch::showResult()
         std::cout<<utils::cosangle(center,image1.cameraCenter,image2.cameraCenter)<<std::endl;
         image2.data.copyTo(im2);
         coord=image2.project(center);
-        cv::circle(im2, cv::Point2d(coord(0,0),coord(1,0)),5, cv::Scalar(0,0,255));
+        cv::circle(im2, cv::Point2d(coord[0],coord[1]),5, cv::Scalar(0,0,255));
         cv::imshow("im2",im2);
         cv::waitKey();
         
@@ -298,7 +318,7 @@ bool Patch::isNeighbor(const Patch&p2)const
 {
     if (this->normal.dot(p2.normal) < cos(120.0 * M_PI / 180.0))
         return false;
-    Mat4x1 diff=this->center-p2.center;
+    cv::Vec4d diff=this->center-p2.center;
     
     const double vunit = this->scale + p2.scale;
     
@@ -317,24 +337,28 @@ bool Patch::isNeighbor(const Patch&p2)const
 //    if (1.0 < hsize)
 //        ftmp /= min(2.0f, hsize);
     
-    if (ftmp < 4)
+    if (ftmp < 2)
         return true;
     else
         return false;
 }
-void Patch:: intersect(const Image&image,double x,double y,Mat4x1&point)const
+void Patch:: intersect(const Image&image,double x,double y,cv::Vec4d&point)const
 {
     //create new Patch;
-    Mat3x1 p2d;
-    p2d(0,0)=x;
-    p2d(1,0)=y;
-    p2d(2,0)=1;
-    Mat4x1 p3d;
-    cv::Mat pinvP=utils::pinv(image.pmat);
-    p3d=pinvP*p2d;
-    p3d=p3d/p3d(3,0);
+    cv::Vec3d p2d(x,y,1);
+    cv::Vec4d p3d;
+    cv::Mat_<double> pinvP=utils::pinv(image.pmat);
+    cv::Vec3d v1(pinvP(0,0),pinvP(0,1),pinvP(0,2));
+    cv::Vec3d v2(pinvP(1,0),pinvP(1,1),pinvP(1,2));
+    cv::Vec3d v3(pinvP(2,0),pinvP(2,1),pinvP(2,2));
+    cv::Vec3d v4(pinvP(3,0),pinvP(3,1),pinvP(3,2));
+    p3d[3]=v4.dot(p2d);
+    p3d[0]=v1.dot(p2d)/p3d[3];
+    p3d[1]=v2.dot(p2d)/p3d[3];
+    p3d[2]=v3.dot(p2d)/p3d[3];
+    p3d[3]=1;
     //std::cout<<p03d<<std::endl;
-    Mat4x1 u=p3d-image.cameraCenter;
+    cv::Vec4d u=p3d-image.cameraCenter;
     u=u/cv::norm(u);
     //std::cout<<u<<std::endl;
     double t=(normal.dot(center)-normal.dot(image.cameraCenter))/(normal.dot(u));
